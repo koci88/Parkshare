@@ -1,0 +1,1472 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>ParkShare</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+:root{
+  --bg:#0d0f14;--sur:#161920;--sur2:#1e2230;--sur3:#252a3a;
+  --brd:#2a2f42;--acc:#4ade80;--acc2:#22d3ee;--acc3:#f59e0b;
+  --txt:#f0f2f8;--mut:#7a82a0;--red:#f87171;--r:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:600;height:56px;
+  display:flex;align-items:center;justify-content:space-between;padding:0 18px;
+  background:rgba(13,15,20,.97);backdrop-filter:blur(20px);border-bottom:1px solid var(--brd);}
+.logo{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;letter-spacing:-.4px;}
+.logo span{color:var(--acc);}
+.nav-tabs{display:flex;gap:3px;}
+.ntab{padding:5px 13px;border-radius:8px;border:none;background:transparent;
+  color:var(--mut);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;}
+.ntab.active{background:var(--sur2);color:var(--acc);}
+
+/* LAYOUT */
+.app{display:flex;height:100vh;padding-top:56px;}
+.sidebar{width:355px;min-width:355px;background:var(--sur);border-right:1px solid var(--brd);
+  overflow-y:auto;display:flex;flex-direction:column;}
+.sidebar::-webkit-scrollbar{width:3px;}
+.sidebar::-webkit-scrollbar-thumb{background:var(--brd);border-radius:3px;}
+.mapwrap{flex:1;position:relative;}
+#map{width:100%;height:100%;}
+.leaflet-container{background:#0d1117!important;}
+.leaflet-tile{filter:invert(1) hue-rotate(180deg) brightness(.7) contrast(1.1) saturate(.6);}
+.leaflet-popup-content-wrapper{background:var(--sur);border:1px solid var(--brd);
+  border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,.8);padding:0;overflow:hidden;}
+.leaflet-popup-content{margin:0;min-width:210px;}
+.leaflet-popup-tip-container{display:none;}
+.pop{padding:12px 14px;}
+.pop-name{font-weight:700;font-size:14px;margin-bottom:2px;}
+.pop-addr{font-size:11px;color:var(--mut);margin-bottom:8px;}
+.pop-row{display:flex;gap:8px;align-items:center;justify-content:space-between;}
+.pop-price{color:var(--acc);font-weight:700;font-size:15px;}
+.pop-btn{padding:5px 13px;border-radius:8px;border:none;background:var(--acc);
+  color:#0d0f14;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;}
+.pop-timer{font-size:11px;color:var(--red);font-weight:600;margin-top:6px;
+  padding:4px 8px;background:rgba(248,113,113,.1);border-radius:6px;border:1px solid rgba(248,113,113,.25);}
+
+/* SEARCH */
+.swrap{padding:10px;border-bottom:1px solid var(--brd);position:relative;}
+.sicon{position:absolute;left:22px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--mut);pointer-events:none;}
+.sbar{width:100%;padding:9px 12px 9px 34px;border-radius:10px;background:var(--sur2);
+  border:1px solid var(--brd);color:var(--txt);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;transition:border-color .15s;cursor:pointer;}
+.sbar:focus{border-color:var(--acc);}
+
+/* SEARCH KEYBOARD OVERLAY */
+.kb-ovl{position:fixed;inset:0;z-index:800;display:flex;flex-direction:column;
+  opacity:0;pointer-events:none;transition:opacity .2s;}
+.kb-ovl.open{opacity:1;pointer-events:all;}
+.kb-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);}
+.kb-sheet{position:absolute;top:0;left:0;width:360px;background:var(--sur);
+  border-right:1px solid var(--brd);height:100%;display:flex;flex-direction:column;
+  transform:translateX(-100%);transition:transform .28s cubic-bezier(.4,0,.2,1);}
+.kb-ovl.open .kb-sheet{transform:translateX(0);}
+.kb-top{padding:12px;border-bottom:1px solid var(--brd);display:flex;gap:8px;align-items:center;}
+.kb-input-wrap{flex:1;position:relative;}
+.kb-input{width:100%;padding:10px 36px 10px 14px;border-radius:10px;background:var(--sur2);
+  border:1.5px solid var(--acc);color:var(--txt);font-family:'DM Sans',sans-serif;font-size:14px;
+  outline:none;caret-color:var(--acc);}
+.kb-clear{position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:var(--mut);font-size:16px;cursor:pointer;padding:2px;}
+.kb-cancel{padding:8px 12px;border-radius:9px;border:none;background:var(--sur2);
+  color:var(--mut);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;}
+.kb-cancel:hover{color:var(--txt);}
+.kb-suggestions{flex:1;overflow-y:auto;padding:8px 10px;}
+.kb-suggestions::-webkit-scrollbar{width:3px;}
+.kb-suggestions::-webkit-scrollbar-thumb{background:var(--brd);}
+.kb-sec-label{font-size:10px;color:var(--mut);font-weight:700;letter-spacing:.5px;
+  text-transform:uppercase;padding:8px 4px 4px;}
+.kb-item{padding:10px 12px;border-radius:10px;cursor:pointer;transition:background .15s;
+  display:flex;align-items:center;gap:10px;margin-bottom:2px;}
+.kb-item:hover{background:var(--sur2);}
+.kb-item-icon{font-size:16px;flex-shrink:0;width:28px;height:28px;border-radius:8px;
+  background:var(--sur2);display:flex;align-items:center;justify-content:center;}
+.kb-item-name{font-size:13px;font-weight:600;line-height:1.3;}
+.kb-item-sub{font-size:11px;color:var(--mut);margin-top:1px;}
+.kb-item-price{margin-left:auto;font-size:12px;font-weight:700;color:var(--acc);white-space:nowrap;}
+.kb-no-results{padding:30px;text-align:center;color:var(--mut);font-size:13px;}
+@media(max-width:768px){
+  .kb-sheet{width:100%;border-right:none;}
+}
+.fbar{padding:8px 10px;display:flex;gap:5px;border-bottom:1px solid var(--brd);}
+.fbtn{flex:1;padding:7px;border-radius:8px;border:1px solid var(--brd);background:transparent;
+  color:var(--mut);font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;cursor:pointer;transition:all .15s;text-align:center;}
+.fbtn.active{background:rgba(74,222,128,.1);border-color:var(--acc);color:var(--acc);}
+.sec-hd{padding:14px 14px 5px;display:flex;align-items:center;justify-content:space-between;}
+.sec-t{font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:700;
+  color:var(--mut);letter-spacing:.5px;text-transform:uppercase;}
+.badge{background:var(--sur2);color:var(--acc);font-size:11px;font-weight:600;
+  padding:2px 9px;border-radius:20px;border:1px solid rgba(74,222,128,.3);}
+
+/* PARK CARD */
+.card{margin:0 10px 8px;border-radius:var(--r);background:var(--sur2);
+  border:1px solid var(--brd);padding:13px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
+.card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+  background:var(--acc);border-radius:3px 0 0 3px;}
+.card.occ::before{background:var(--red);}
+.card.sel{border-color:var(--acc2);background:#1a2235;}
+.card:hover{border-color:var(--acc);transform:translateX(2px);}
+.card-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:7px;}
+.card-name{font-weight:600;font-size:14px;line-height:1.3;}
+.card-addr{font-size:11px;color:var(--mut);margin-top:2px;}
+.ptag{background:rgba(74,222,128,.1);color:var(--acc);font-weight:700;font-size:14px;
+  padding:3px 9px;border-radius:7px;border:1px solid rgba(74,222,128,.2);white-space:nowrap;}
+.ptag.occ{background:rgba(248,113,113,.08);color:var(--red);border-color:rgba(248,113,113,.2);}
+.cmeta{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px;}
+.chip{font-size:10px;font-weight:500;padding:2px 8px;border-radius:5px;
+  background:var(--sur);border:1px solid var(--brd);display:flex;align-items:center;gap:3px;}
+.chip.t{color:var(--acc2);border-color:rgba(34,211,238,.25);background:rgba(34,211,238,.04);}
+.chip.tp{color:var(--acc3);border-color:rgba(245,158,11,.25);background:rgba(245,158,11,.04);}
+.chip.nb{color:var(--mut);}
+.avb{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;
+  padding:2px 7px;border-radius:5px;}
+.avb.fr{background:rgba(74,222,128,.12);color:var(--acc);}
+.avb.oc{background:rgba(248,113,113,.12);color:var(--red);}
+.dot{width:5px;height:5px;border-radius:50%;display:inline-block;flex-shrink:0;}
+.dot.g{background:var(--acc);}.dot.r{background:var(--red);}
+.nbox{margin-top:8px;padding:6px 9px;border-radius:7px;
+  background:rgba(74,222,128,.04);border:1px dashed rgba(74,222,128,.18);
+  font-size:10px;color:var(--mut);font-style:italic;}
+/* occupancy countdown on card */
+.occ-bar{margin-top:8px;padding:6px 9px;border-radius:7px;
+  background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.2);
+  font-size:11px;font-weight:600;color:var(--red);display:flex;align-items:center;gap:6px;}
+.occ-bar-inner{flex:1;height:4px;background:rgba(248,113,113,.2);border-radius:2px;overflow:hidden;}
+.occ-bar-fill{height:100%;background:var(--red);border-radius:2px;transition:width 1s linear;}
+/* reserve slot on card */
+.res-slot{margin-top:6px;padding:5px 9px;border-radius:7px;
+  background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);
+  font-size:10px;color:var(--acc3);display:flex;align-items:center;justify-content:space-between;}
+.res-btn-sm{padding:3px 9px;border-radius:5px;border:none;background:var(--acc3);
+  color:#0d0f14;font-size:10px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;}
+/* fav star on card */
+.fav-star{position:absolute;top:10px;right:10px;font-size:16px;cursor:pointer;
+  transition:transform .2s;z-index:5;}
+.fav-star:hover{transform:scale(1.3);}
+.nearest-badge{position:absolute;top:10px;left:14px;background:var(--acc);color:#0d0f14;
+  font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:.3px;}
+
+/* DETAIL PANEL */
+.dp{position:fixed;right:0;top:56px;bottom:0;width:400px;background:var(--sur);
+  border-left:1px solid var(--brd);z-index:400;
+  transform:translateX(105%);transition:transform .3s cubic-bezier(.4,0,.2,1);
+  overflow-y:auto;display:flex;flex-direction:column;}
+.dp.open{transform:translateX(0);}
+.dp::-webkit-scrollbar{width:3px;}
+.dp::-webkit-scrollbar-thumb{background:var(--brd);}
+.dp-hd{padding:14px;border-bottom:1px solid var(--brd);
+  display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+.xbtn{width:28px;height:28px;min-width:28px;border-radius:7px;border:1px solid var(--brd);
+  background:var(--sur2);color:var(--mut);font-size:13px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.xbtn:hover{background:var(--red);color:#fff;border-color:var(--red);}
+.stars{color:#f59e0b;font-size:12px;}
+
+/* OCCUPANCY DETAIL */
+.occ-detail{margin:10px 14px 0;padding:10px 12px;border-radius:10px;
+  background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.25);}
+.occ-detail-title{font-size:12px;font-weight:700;color:var(--red);margin-bottom:6px;}
+.occ-countdown{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:var(--red);}
+.occ-sub{font-size:11px;color:var(--mut);margin-top:2px;}
+.occ-progress{height:5px;background:rgba(248,113,113,.2);border-radius:3px;margin-top:8px;overflow:hidden;}
+.occ-prog-fill{height:100%;background:var(--red);border-radius:3px;transition:width 1s linear;}
+.res-future-btn{margin-top:10px;width:100%;padding:8px;border-radius:9px;border:1px solid var(--acc3);
+  background:rgba(245,158,11,.08);color:var(--acc3);font-family:'DM Sans',sans-serif;
+  font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;}
+.res-future-btn:hover{background:rgba(245,158,11,.15);}
+
+/* OSM BTN */
+.osmb{display:flex;align-items:center;gap:7px;padding:9px 14px;border-radius:10px;
+  border:1px solid rgba(34,211,238,.35);background:rgba(34,211,238,.06);color:var(--acc2);
+  font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;
+  transition:all .15s;width:100%;justify-content:center;}
+.osmb:hover{background:rgba(34,211,238,.13);}
+
+/* FAV BTN IN DETAIL */
+.fav-dp-btn{display:flex;align-items:center;gap:7px;padding:9px 14px;border-radius:10px;
+  border:1px solid rgba(245,158,11,.35);background:rgba(245,158,11,.06);color:var(--acc3);
+  font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;
+  transition:all .15s;width:100%;justify-content:center;}
+.fav-dp-btn:hover{background:rgba(245,158,11,.13);}
+.fav-dp-btn.saved{background:rgba(245,158,11,.18);border-color:var(--acc3);}
+
+/* ════ DRUM PICKER ════ */
+.picker-sec{padding:14px 14px 0;border-bottom:1px solid var(--brd);}
+.plabel{font-size:11px;color:var(--mut);font-weight:600;margin-bottom:9px;letter-spacing:.4px;text-transform:uppercase;}
+.pwrap{display:flex;align-items:center;justify-content:center;background:var(--sur2);
+  border-radius:13px;overflow:hidden;border:1px solid var(--brd);position:relative;}
+.pwrap::before{content:'';position:absolute;top:50%;left:0;right:0;height:44px;
+  transform:translateY(-50%);background:rgba(74,222,128,.07);
+  border-top:1px solid rgba(74,222,128,.28);border-bottom:1px solid rgba(74,222,128,.28);
+  pointer-events:none;z-index:2;}
+.pwrap::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:3;
+  background:linear-gradient(to bottom,var(--sur2) 0%,rgba(30,34,48,0) 32%,rgba(30,34,48,0) 68%,var(--sur2) 100%);}
+.drum{width:84px;height:220px;overflow:hidden;position:relative;cursor:grab;
+  user-select:none;touch-action:none;}
+.drum:active{cursor:grabbing;}
+.drum-inner{display:flex;flex-direction:column;will-change:transform;}
+.di{height:44px;display:flex;align-items:center;justify-content:center;
+  font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:500;
+  color:rgba(122,130,160,.35);flex-shrink:0;}
+.di.c0{color:var(--txt);font-size:27px;font-weight:700;}
+.di.c1{color:rgba(240,242,248,.48);font-size:21px;}
+.di.c2{color:rgba(240,242,248,.18);font-size:17px;}
+.dsep{width:22px;height:220px;display:flex;align-items:center;justify-content:center;
+  font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;
+  color:rgba(74,222,128,.35);position:relative;z-index:1;}
+.tsum{text-align:center;padding:7px 0 13px;font-size:12px;color:var(--mut);}
+.tsum strong{color:var(--acc2);font-size:13px;}
+
+/* DURATION */
+.dur-sec{padding:12px 14px;border-bottom:1px solid var(--brd);}
+.dur-bar{display:flex;gap:5px;margin-top:8px;}
+.dbtn{flex:1;padding:7px 4px;border-radius:8px;border:1px solid var(--brd);
+  background:var(--sur2);color:var(--mut);font-size:11px;font-weight:600;
+  cursor:pointer;transition:all .15s;text-align:center;}
+.dbtn.active{background:rgba(74,222,128,.15);border-color:var(--acc);color:var(--acc);}
+
+/* COST */
+.cbox{margin:12px 14px;background:var(--sur2);border-radius:12px;border:1px solid var(--brd);}
+.crow{display:flex;justify-content:space-between;align-items:center;
+  padding:8px 12px;border-bottom:1px solid var(--brd);font-size:13px;}
+.crow:last-child{border-bottom:none;}
+.crow.tot{font-weight:700;font-size:15px;color:var(--acc);}
+.clbl{color:var(--mut);}
+
+/* PAYMENT */
+.paysec{padding:0 14px 14px;}
+.paylbl{font-size:11px;color:var(--mut);font-weight:600;margin-bottom:8px;letter-spacing:.4px;text-transform:uppercase;}
+.paymths{display:flex;gap:6px;margin-bottom:12px;}
+.pm{flex:1;padding:8px 5px;border-radius:10px;border:1px solid var(--brd);
+  background:var(--sur2);cursor:pointer;transition:all .15s;text-align:center;
+  font-size:11px;font-weight:600;color:var(--mut);
+  display:flex;flex-direction:column;align-items:center;gap:3px;}
+.pm .pmi{font-size:17px;}
+.pm.active{border-color:var(--acc2);background:rgba(34,211,238,.1);color:var(--acc2);}
+.twint{background:#e00;color:#fff;font-weight:700;font-size:9px;padding:1px 4px;border-radius:3px;}
+.bookbtn{width:100%;padding:12px;border-radius:12px;border:none;
+  background:linear-gradient(135deg,var(--acc),#22c55e);
+  color:#0d0f14;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;
+  cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:7px;}
+.bookbtn:hover{transform:translateY(-1px);box-shadow:0 8px 28px rgba(74,222,128,.4);}
+.bookbtn:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+
+/* OWNER FORM */
+.of{padding:13px;}
+.ig{margin-bottom:11px;}
+.il{font-size:11px;color:var(--mut);font-weight:600;margin-bottom:5px;
+  display:block;letter-spacing:.3px;text-transform:uppercase;}
+.ifield{width:100%;padding:9px 12px;border-radius:10px;background:var(--sur2);
+  border:1px solid var(--brd);color:var(--txt);font-family:'DM Sans',sans-serif;
+  font-size:13px;outline:none;transition:border-color .15s;}
+.ifield:focus{border-color:var(--acc);}
+.ifield::placeholder{color:var(--mut);}
+textarea.ifield{resize:vertical;min-height:65px;}
+select.ifield{appearance:none;cursor:pointer;}
+.locbtn{width:100%;padding:9px;border-radius:10px;
+  border:1px solid rgba(34,211,238,.35);background:rgba(34,211,238,.06);
+  color:var(--acc2);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;
+  cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:9px;}
+.locbtn:hover{background:rgba(34,211,238,.13);}
+.mhint{font-size:11px;color:var(--mut);text-align:center;margin-bottom:9px;
+  padding:6px;background:var(--sur2);border-radius:8px;border:1px solid var(--brd);}
+.pubBtn{width:100%;padding:11px;border-radius:12px;border:none;
+  background:linear-gradient(135deg,var(--acc2),#06b6d4);
+  color:#0d0f14;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;}
+.pubBtn:hover{transform:translateY(-1px);box-shadow:0 8px 28px rgba(34,211,238,.3);}
+
+/* MODALS */
+.ovl{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:700;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .25s;}
+.ovl.open{opacity:1;pointer-events:all;}
+.mbox{background:var(--sur);border:1px solid var(--brd);border-radius:18px;
+  width:660px;max-width:95vw;overflow:hidden;display:flex;flex-direction:column;
+  transform:scale(.95);transition:transform .25s;max-height:88vh;}
+.ovl.open .mbox{transform:scale(1);}
+.mhd{padding:13px 16px;border-bottom:1px solid var(--brd);
+  display:flex;align-items:center;justify-content:space-between;}
+.mhd h3{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;}
+.mft{padding:11px 16px;border-top:1px solid var(--brd);display:flex;gap:10px;align-items:center;}
+.saddr{flex:1;font-size:12px;color:var(--mut);font-style:italic;}
+.cfmbtn{padding:8px 18px;border-radius:9px;border:none;background:var(--acc);
+  color:#0d0f14;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;}
+.mapinstr{position:absolute;top:10px;left:50%;transform:translateX(-50%);
+  background:rgba(13,15,20,.92);border:1px solid var(--brd);
+  padding:6px 13px;border-radius:8px;font-size:12px;color:var(--txt);
+  white-space:nowrap;z-index:10;pointer-events:none;}
+#ownerMap,#renterMap{width:100%;height:400px;}
+
+/* PUSH NOTIFICATION */
+.notif{position:fixed;top:68px;right:16px;z-index:800;
+  background:var(--sur);border:1px solid var(--brd);border-radius:14px;
+  padding:12px 14px;min-width:280px;max-width:320px;
+  box-shadow:0 8px 40px rgba(0,0,0,.6);
+  transform:translateX(360px);transition:transform .35s cubic-bezier(.4,0,.2,1);
+  display:flex;gap:10px;align-items:flex-start;}
+.notif.show{transform:translateX(0);}
+.notif-icon{font-size:20px;flex-shrink:0;}
+.notif-body{flex:1;}
+.notif-title{font-weight:700;font-size:13px;margin-bottom:2px;}
+.notif-msg{font-size:12px;color:var(--mut);line-height:1.4;}
+.notif-time{font-size:10px;color:var(--mut);margin-top:4px;}
+.notif-close{font-size:12px;color:var(--mut);cursor:pointer;align-self:flex-start;}
+
+/* REMINDER POPUP */
+.reminder-ovl{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:900;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .25s;}
+.reminder-ovl.open{opacity:1;pointer-events:all;}
+.reminder-box{background:var(--sur);border:1px solid var(--acc3);border-radius:18px;
+  padding:24px;max-width:340px;width:90%;text-align:center;
+  transform:scale(.9) translateY(20px);transition:all .3s;}
+.reminder-ovl.open .reminder-box{transform:scale(1) translateY(0);}
+.reminder-icon{font-size:40px;margin-bottom:10px;}
+.reminder-title{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;margin-bottom:8px;}
+.reminder-msg{font-size:13px;color:var(--mut);line-height:1.5;margin-bottom:16px;}
+.reminder-countdown{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;
+  color:var(--acc3);margin-bottom:16px;}
+.rbtn-row{display:flex;gap:8px;}
+.rbtn{flex:1;padding:10px;border-radius:10px;border:none;font-family:'DM Sans',sans-serif;
+  font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;}
+.rbtn.primary{background:var(--acc);color:#0d0f14;}
+.rbtn.secondary{background:var(--sur2);color:var(--txt);border:1px solid var(--brd);}
+
+/* DEPART POPUP */
+.depart-ovl{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:910;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .25s;}
+.depart-ovl.open{opacity:1;pointer-events:all;}
+.depart-box{background:var(--sur);border:1px solid var(--acc2);border-radius:18px;
+  padding:24px;max-width:340px;width:90%;text-align:center;
+  transform:translateY(30px);transition:all .3s;}
+.depart-ovl.open .depart-box{transform:translateY(0);}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);
+  background:var(--sur);border:1px solid var(--acc);padding:11px 20px;border-radius:12px;
+  font-weight:600;font-size:13px;transition:transform .3s cubic-bezier(.4,0,.2,1);z-index:999;
+  display:flex;align-items:center;gap:8px;box-shadow:0 8px 40px rgba(0,0,0,.5);}
+.toast.show{transform:translateX(-50%) translateY(0);}
+
+@media(max-width:768px){
+  .sidebar{width:100%;min-width:0;}
+  .mapwrap{display:none;}
+  .dp{width:100%;}
+  .mbox{width:100%;border-radius:18px 18px 0 0;position:fixed;bottom:0;max-height:92vh;}
+  #ownerMap,#renterMap{height:260px;}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">Park<span>Share</span></div>
+  <div class="nav-tabs">
+    <button class="ntab active" onclick="switchMode('search')">🔍 Suchen</button>
+    <button class="ntab" onclick="switchMode('rent')">➕ Vermieten</button>
+    <button class="ntab" onclick="switchMode('favs')" id="favTab">⭐ Favoriten</button>
+  </div>
+</nav>
+
+<div class="app">
+  <div class="sidebar" id="sidebar">
+
+    <!-- SEARCH -->
+    <div id="searchMode">
+      <div class="swrap" onclick="openKb()" style="cursor:pointer;">
+        <span class="sicon">🔍</span>
+        <div class="sbar" id="searchDisplay" style="display:flex;align-items:center;cursor:pointer;">
+          <span id="searchDisplayText" style="color:var(--mut);">Ort, Adresse oder Quartier…</span>
+        </div>
+      </div>
+      <div class="fbar">
+        <button class="fbtn active" onclick="setFilter(this,'all')">🅿️ Alle</button>
+        <button class="fbtn" onclick="setFilter(this,'garage')">🏠 Garage</button>
+        <button class="fbtn" onclick="setFilter(this,'open')">☀️ Freiluft</button>
+        <button class="fbtn" onclick="setFilter(this,'free')">✅ Frei</button>
+      </div>
+      <div class="sec-hd">
+        <span class="sec-t">Parkplätze</span>
+        <span class="badge" id="cntBadge">– frei</span>
+      </div>
+      <div id="cardList"></div>
+    </div>
+
+    <!-- FAVORITES -->
+    <div id="favsMode" style="display:none;">
+      <div class="sec-hd"><span class="sec-t">Meine Favoriten</span></div>
+      <div id="favList"></div>
+    </div>
+
+    <!-- RENT -->
+    <div id="rentMode" style="display:none;">
+      <div class="sec-hd"><span class="sec-t">Platz erfassen</span></div>
+      <div class="of">
+        <button class="locbtn" onclick="locateOwner()">📍 GPS – Aktuellen Standort</button>
+        <div class="mhint">oder Standort direkt auf Karte wählen</div>
+        <button class="osmb" onclick="openOwnerMap()" style="margin-bottom:12px;">🗺️ Auf OpenStreetMap markieren</button>
+        <div class="ig"><label class="il">Bezeichnung</label>
+          <input class="ifield" id="ownerName" placeholder="z.B. Tiefgarage Platz B-12"></div>
+        <div class="ig"><label class="il">Adresse</label>
+          <input class="ifield" id="ownerAddr" placeholder="Strasse, Hausnummer, PLZ"></div>
+        <div class="ig"><label class="il">Typ</label>
+          <select class="ifield" id="ownerType">
+            <option>🏠 Tiefgarage</option><option>🏘️ Carport</option><option>☀️ Freiluft-Parkplatz</option>
+          </select></div>
+        <div class="ig"><label class="il">Preis / Stunde (CHF)</label>
+          <input type="number" class="ifield" id="ownerPrice" value="3.50" step="0.50" min="1"></div>
+        <div class="ig"><label class="il">Verfügbar von – bis</label>
+          <div style="display:flex;gap:7px;">
+            <input type="time" class="ifield" id="ownerFrom" value="08:00" style="flex:1;">
+            <span style="align-self:center;color:var(--mut);">–</span>
+            <input type="time" class="ifield" id="ownerTo" value="18:00" style="flex:1;">
+          </div></div>
+        <div class="ig"><label class="il">Max. Parkdauer</label>
+          <select class="ifield" id="ownerMax">
+            <option>1 Stunde</option><option>2 Stunden</option>
+            <option selected>4 Stunden</option><option>8 Stunden</option><option>Ganzer Tag</option>
+          </select></div>
+        <div class="ig"><label class="il">Notiz für Mieter</label>
+          <textarea class="ifield" id="ownerNote" placeholder="z.B. Einfahrt rechts, Tor-Code 1234, Ebene -2 Platz 17…"></textarea></div>
+        <button class="pubBtn" onclick="publishSpot()">📤 Parkplatz veröffentlichen</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="mapwrap"><div id="map"></div></div>
+</div>
+
+<!-- DETAIL PANEL -->
+<div class="dp" id="dp">
+  <div class="dp-hd">
+    <div style="flex:1;">
+      <div id="dpName" style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;"></div>
+      <div id="dpAddr" style="font-size:12px;color:var(--mut);margin-top:2px;"></div>
+      <div style="margin-top:6px;display:flex;gap:7px;align-items:center;flex-wrap:wrap;">
+        <div class="stars">★★★★☆</div>
+        <span style="font-size:11px;color:var(--mut);">4.2 (18 Bew.)</span>
+        <span id="dpAvail" class="avb fr"><span class="dot g"></span>Jetzt frei</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;align-items:flex-start;">
+      <button id="favDpBtn" class="fav-dp-btn" onclick="toggleFavDetail()" style="width:auto;padding:6px 12px;font-size:12px;">⭐ Favorit</button>
+      <button class="xbtn" onclick="closeDetail()">✕</button>
+    </div>
+  </div>
+
+  <div style="padding:10px 14px 0;"><div class="nbox" id="dpNote"></div></div>
+
+  <!-- OCCUPANCY TIMER (shown when occupied) -->
+  <div id="occDetail" style="display:none;">
+    <div class="occ-detail">
+      <div class="occ-detail-title">🚗 Derzeit belegt – verbleibende Zeit</div>
+      <div class="occ-countdown" id="occCountdown">--:--</div>
+      <div class="occ-sub" id="occSub"></div>
+      <div class="occ-progress"><div class="occ-prog-fill" id="occProgFill" style="width:50%"></div></div>
+      <button class="res-future-btn" onclick="reserveAfterOcc()">📅 Für danach reservieren</button>
+    </div>
+  </div>
+
+  <div style="padding:10px 14px 4px;">
+    <button class="osmb" onclick="openRenterMap()">🗺️ Auf OpenStreetMap anzeigen &amp; Route</button>
+  </div>
+
+  <!-- DRUM PICKER (hidden when occupied) -->
+  <div id="bookSection">
+    <div class="picker-sec">
+      <div class="plabel">Ankunftszeit wählen</div>
+      <div class="pwrap">
+        <div class="drum" id="drumH"></div>
+        <div class="dsep">:</div>
+        <div class="drum" id="drumM"></div>
+      </div>
+      <div class="tsum" id="tsum">Ankunft: <strong>08:00</strong></div>
+    </div>
+
+    <div class="dur-sec">
+      <div class="plabel">Parkdauer</div>
+      <div class="dur-bar">
+        <button class="dbtn" onclick="setDur(this,.5)">30 min</button>
+        <button class="dbtn active" onclick="setDur(this,1)">1 Std</button>
+        <button class="dbtn" onclick="setDur(this,2)">2 Std</button>
+        <button class="dbtn" onclick="setDur(this,3)">3 Std</button>
+        <button class="dbtn" onclick="setDur(this,4)">4 Std</button>
+      </div>
+    </div>
+
+    <div class="cbox">
+      <div class="crow"><span class="clbl">Parkgebühr</span><span id="cBase">CHF 3.50</span></div>
+      <div class="crow"><span class="clbl">Servicegebühr</span><span>CHF 0.50</span></div>
+      <div class="crow tot"><span>Total</span><span id="cTot">CHF 4.00</span></div>
+    </div>
+
+    <div class="paysec">
+      <div class="paylbl">Zahlungsmethode</div>
+      <div class="paymths">
+        <div class="pm active" onclick="setPay(this)"><span class="pmi">💳</span><span>Visa</span></div>
+        <div class="pm" onclick="setPay(this)"><span class="pmi">💳</span><span>Master</span></div>
+        <div class="pm" onclick="setPay(this)"><span class="pmi">🇨🇭</span><span><span class="twint">TWINT</span></span></div>
+      </div>
+      <button class="bookbtn" id="bookBtn" onclick="book()">🅿️ Jetzt buchen – <span id="btnTot">CHF 4.00</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- OWNER MAP MODAL -->
+<div class="ovl" id="ownerOvl">
+  <div class="mbox">
+    <div class="mhd"><h3>📍 Standort wählen</h3><button class="xbtn" onclick="closeOwnerMap()">✕</button></div>
+    <div style="position:relative;"><div id="ownerMap"></div><div class="mapinstr">Klicke auf die Karte → Nadel setzen (danach verschiebbar)</div></div>
+    <div class="mft"><div class="saddr" id="ownerSelAddr">Noch kein Standort…</div>
+      <button class="cfmbtn" onclick="confirmOwnerLoc()">✅ Übernehmen</button></div>
+  </div>
+</div>
+
+<!-- RENTER MAP MODAL -->
+<div class="ovl" id="renterOvl">
+  <div class="mbox">
+    <div class="mhd"><h3 id="renterTitle">🗺️ Parkplatz anzeigen</h3><button class="xbtn" onclick="closeRenterMap()">✕</button></div>
+    <div style="position:relative;"><div id="renterMap"></div></div>
+    <div class="mft"><div class="saddr" id="renterAddr"></div>
+      <button class="cfmbtn" onclick="closeRenterMap()" style="background:var(--acc2);">Schliessen</button></div>
+  </div>
+</div>
+
+<!-- REMINDER POPUP -->
+<div class="reminder-ovl" id="reminderOvl">
+  <div class="reminder-box">
+    <div class="reminder-icon">⏰</div>
+    <div class="reminder-title">Parkzeit läuft bald ab!</div>
+    <div class="reminder-msg">Deine gebuchte Parkzeit endet in:</div>
+    <div class="reminder-countdown" id="reminderCount">10:00</div>
+    <div class="reminder-msg" id="reminderSpot" style="margin-bottom:8px;"></div>
+    <div class="rbtn-row">
+      <button class="rbtn secondary" onclick="dismissReminder()">OK, ich fahre weg</button>
+      <button class="rbtn primary" onclick="extendParking()">🕐 30 min verlängern</button>
+    </div>
+  </div>
+</div>
+
+<!-- DEPART POPUP -->
+<div class="depart-ovl" id="departOvl">
+  <div class="depart-box">
+    <div style="font-size:38px;margin-bottom:10px;">🚗💨</div>
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;margin-bottom:8px;">Parkplatz freigeben?</div>
+    <div style="font-size:13px;color:var(--mut);line-height:1.5;margin-bottom:16px;">
+      Wir haben erkannt, dass du dich vom Parkplatz entfernt hast.<br>Soll der Parkplatz jetzt freigegeben werden?
+    </div>
+    <div id="departSpotName" style="font-size:13px;font-weight:600;margin-bottom:16px;color:var(--acc2);"></div>
+    <div class="rbtn-row">
+      <button class="rbtn secondary" onclick="closeDepartPopup()">Nein, ich bin noch da</button>
+      <button class="rbtn primary" onclick="confirmDepart()" style="background:var(--acc2);color:#0d0f14;">Ja, freigeben</button>
+    </div>
+  </div>
+</div>
+
+<!-- NOTIFICATIONS -->
+<div class="notif" id="notif">
+  <div class="notif-icon" id="notifIcon">🔔</div>
+  <div class="notif-body">
+    <div class="notif-title" id="notifTitle">Benachrichtigung</div>
+    <div class="notif-msg" id="notifMsg"></div>
+    <div class="notif-time" id="notifTime"></div>
+  </div>
+  <div class="notif-close" onclick="closeNotif()">✕</div>
+</div>
+
+<!-- KEYBOARD SEARCH OVERLAY -->
+<div class="kb-ovl" id="kbOvl">
+  <div class="kb-backdrop" onclick="closeKb()"></div>
+  <div class="kb-sheet">
+    <div class="kb-top">
+      <div class="kb-input-wrap">
+        <input class="kb-input" id="kbInput" type="text" placeholder="Ort, Adresse oder Quartier…"
+          oninput="kbFilter(this.value)" autocomplete="off" autocorrect="off" spellcheck="false">
+        <button class="kb-clear" id="kbClearBtn" onclick="kbClear()" style="display:none;">✕</button>
+      </div>
+      <button class="kb-cancel" onclick="closeKb()">Abbrechen</button>
+    </div>
+    <div class="kb-suggestions" id="kbSuggestions"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toastIcon">✅</span><span id="toastMsg">OK</span></div>
+
+<!-- Load Leaflet AFTER DOM -->
+<script>
+/* ══════════════════════════════════════════════
+   DATA
+══════════════════════════════════════════════ */
+var spots = [
+  {id:0, name:"Tiefgarage HB Zürich P3",    addr:"Bahnhofstrasse 12, 8001 Zürich",  type:"🏠 Tiefgarage",         price:3.50, from:"06:00", to:"22:00", maxH:4,  free:true,  note:"Einfahrt rechts neben dem Restaurant. Lift Ebene -2, Platz 17. Tor-Code: 4821", lat:47.3782, lng:8.5403, dist:90},
+  {id:1, name:"Parkplatz Hofgasse Bern",     addr:"Hofgasse 5, 3011 Bern",           type:"☀️ Freiluft",            price:2.00, from:"07:00", to:"20:00", maxH:2,  free:true,  note:"Weisses Tor öffnet automatisch. Platz Nr. 7.", lat:46.9481, lng:7.4488, dist:320},
+  {id:2, name:"Carport Seestrasse",          addr:"Seestrasse 88, 8002 Zürich",      type:"🏘️ Carport",             price:3.00, from:"08:00", to:"18:00", maxH:4,  free:false, note:"", lat:47.3640, lng:8.5388, dist:450,
+    occEndTs: Date.now() + 38*60*1000, occTotalMs: 90*60*1000},
+  {id:3, name:"Privat-Garage Altstadt",      addr:"Münstergasse 3, 8001 Zürich",     type:"🏠 Tiefgarage",          price:4.00, from:"00:00", to:"23:59", maxH:8,  free:true,  note:"Zugang via App-Code. Code per SMS nach Buchung.", lat:47.3755, lng:8.5445, dist:180},
+  {id:4, name:"Quartier-Parkplatz Westend",  addr:"Langstrasse 201, 8004 Zürich",    type:"☀️ Freiluft",            price:1.50, from:"09:00", to:"21:00", maxH:4,  free:true,  note:"Schranke mit Kennzeichen-Erkennung.",  lat:47.3810, lng:8.5270, dist:600},
+  {id:5, name:"VIP Parking Paradeplatz",     addr:"Paradeplatz 1, 8001 Zürich",      type:"🏠 Tiefgarage",          price:5.00, from:"05:00", to:"24:00", maxH:24, free:false, note:"Videoüberwachung, Lift direkt beim Eingang.", lat:47.3705, lng:8.5387, dist:250,
+    occEndTs: Date.now() + 12*60*1000, occTotalMs: 60*60*1000},
+];
+
+/* ══ FAVORITES ══ */
+var favIds = [];
+function isFav(id){ return favIds.indexOf(id) >= 0; }
+function toggleFav(id){
+  if(isFav(id)){ favIds.splice(favIds.indexOf(id),1); }
+  else { favIds.push(id); }
+  renderCards(currentList());
+  updateFavBtn(id);
+  renderFavs();
+}
+function toggleFavDetail(){
+  if(selSpot===null) return;
+  toggleFav(selSpot);
+}
+function updateFavBtn(id){
+  var btn = document.getElementById('favDpBtn');
+  if(isFav(id)){ btn.textContent='⭐ Gespeichert'; btn.classList.add('saved'); }
+  else { btn.textContent='⭐ Favorit'; btn.classList.remove('saved'); }
+}
+function renderFavs(){
+  var el = document.getElementById('favList');
+  var fl = spots.filter(function(s){ return isFav(s.id); });
+  if(!fl.length){
+    el.innerHTML='<div style="padding:30px;text-align:center;color:var(--mut);font-size:13px;">Noch keine Favoriten gespeichert.</div>';
+    return;
+  }
+  el.innerHTML = fl.map(function(s){ return cardHTML(s,false); }).join('');
+}
+
+/* ══════════════════════════════════════════════
+   LEAFLET MAP (loaded after DOM ready)
+══════════════════════════════════════════════ */
+var mainMap, mks = {};
+
+function initMap(){
+  mainMap = L.map('map', {zoomControl:false}).setView([47.373, 8.537], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© <a href="https://www.openstreetmap.org">OpenStreetMap</a>', maxZoom:19
+  }).addTo(mainMap);
+  L.control.zoom({position:'bottomright'}).addTo(mainMap);
+
+  spots.forEach(function(s){
+    var m = L.marker([s.lat, s.lng], {icon: mkIcon(s.free, false)}).addTo(mainMap);
+    m.bindPopup(popHTML(s), {className:'', maxWidth:260, closeButton:false});
+    m.on('click', (function(sid){ return function(){ selectSpot(sid); }; })(s.id));
+    mks[s.id] = m;
+  });
+}
+
+function mkIcon(free, sel){
+  var c = sel ? '#22d3ee' : (free ? '#4ade80' : '#f87171');
+  var sz = sel ? 40 : 34;
+  return L.divIcon({
+    html: '<svg xmlns="http://www.w3.org/2000/svg" width="'+sz+'" height="'+(sz*1.22)+'" viewBox="0 0 34 42">'+
+      '<path d="M17 0C7.6 0 0 7.6 0 17c0 11.3 17 25 17 25S34 28.3 34 17C34 7.6 26.4 0 17 0z" fill="'+c+'"/>'+
+      '<circle cx="17" cy="17" r="9" fill="rgba(0,0,0,.3)"/>'+
+      '<text x="17" y="22" text-anchor="middle" font-size="12" font-family="sans-serif" fill="white" font-weight="bold">P</text>'+
+      '</svg>',
+    className:'', iconSize:[sz, sz*1.22], iconAnchor:[sz/2, sz*1.22], popupAnchor:[0, -sz*1.22]
+  });
+}
+
+function popHTML(s){
+  var timer = '';
+  if(!s.free && s.occEndTs){
+    var rem = Math.max(0, s.occEndTs - Date.now());
+    var m = Math.floor(rem/60000), sec = Math.floor((rem%60000)/1000);
+    timer = '<div class="pop-timer">⏱ Frei in: '+pad(m)+':'+pad(sec)+'</div>';
+  }
+  return '<div class="pop">'+
+    '<div class="pop-name">'+s.name+'</div>'+
+    '<div class="pop-addr">📍 '+s.addr+'</div>'+
+    timer+
+    '<div class="pop-row">'+
+      '<span class="pop-price">CHF '+s.price.toFixed(2)+'/h</span>'+
+      (s.free
+        ? '<button class="pop-btn" onclick="selectSpot('+s.id+')">Details →</button>'
+        : '<span style="font-size:11px;color:var(--red);">Belegt</span>')+
+    '</div></div>';
+}
+
+/* ══════════════════════════════════════════════
+   CARDS
+══════════════════════════════════════════════ */
+var selSpot = null;
+var activeFilter = 'all';
+var searchQ = '';
+
+function currentList(){
+  var list = spots.slice();
+  // sort: free nearest first
+  list.sort(function(a,b){
+    if(a.free && !b.free) return -1;
+    if(!a.free && b.free) return 1;
+    return a.dist - b.dist;
+  });
+  if(searchQ){
+    var q = searchQ.toLowerCase();
+    list = list.filter(function(s){
+      return s.name.toLowerCase().indexOf(q)>=0 || s.addr.toLowerCase().indexOf(q)>=0;
+    });
+  }
+  if(activeFilter==='garage'){
+    list = list.filter(function(s){ return s.type.indexOf('Tiefgarage')>=0 || s.type.indexOf('Carport')>=0; });
+  } else if(activeFilter==='open'){
+    list = list.filter(function(s){ return s.type.indexOf('Freiluft')>=0; });
+  } else if(activeFilter==='free'){
+    list = list.filter(function(s){ return s.free; });
+  }
+  return list;
+}
+
+function occTimeString(s){
+  if(!s.occEndTs) return '';
+  var rem = Math.max(0, s.occEndTs - Date.now());
+  var m = Math.floor(rem/60000), sec = Math.floor((rem%60000)/1000);
+  return pad(m)+':'+pad(sec);
+}
+function occPct(s){
+  if(!s.occEndTs || !s.occTotalMs) return 50;
+  var rem = Math.max(0, s.occEndTs - Date.now());
+  return Math.round((rem / s.occTotalMs) * 100);
+}
+
+function cardHTML(s, isNearest){
+  var occTimer = '';
+  if(!s.free && s.occEndTs){
+    var pct = occPct(s);
+    occTimer = '<div class="occ-bar">'+
+      '⏱ Frei in: <span class="occ-timer-val" data-id="'+s.id+'">'+occTimeString(s)+'</span>'+
+      '<div class="occ-bar-inner"><div class="occ-bar-fill" data-id="fill-'+s.id+'" style="width:'+pct+'%"></div></div>'+
+      '</div>'+
+      '<div class="res-slot">📅 Jetzt für danach vormerken<button class="res-btn-sm" onclick="event.stopPropagation();reserveAfterOccById('+s.id+')">Vormerken</button></div>';
+  }
+  return '<div class="card '+(s.free?'':'occ ')+(selSpot===s.id?'sel':'')+'" onclick="selectSpot('+s.id+')" style="position:relative;">'+
+    (isNearest ? '<div class="nearest-badge">NÄCHSTER</div>' : '')+
+    '<span class="fav-star" onclick="event.stopPropagation();toggleFav('+s.id+')" title="Favorit">'+(isFav(s.id)?'⭐':'☆')+'</span>'+
+    '<div class="card-top" style="margin-right:20px;">'+
+      '<div><div class="card-name">'+s.name+'</div><div class="card-addr">📍 '+s.addr+'</div></div>'+
+      '<div class="ptag '+(s.free?'':'occ')+'">CHF '+s.price.toFixed(2)+'<small>/h</small></div>'+
+    '</div>'+
+    '<div class="cmeta">'+
+      '<span class="chip t">🕐 '+s.from+'–'+s.to+'</span>'+
+      '<span class="chip tp">'+s.type+'</span>'+
+      '<span class="chip nb">📏 '+s.dist+'m</span>'+
+      '<span class="avb '+(s.free?'fr':'oc')+'">'+(s.free?'<span class="dot g"></span>Frei':'<span class="dot r"></span>Belegt')+'</span>'+
+    '</div>'+
+    (s.note ? '<div class="nbox">💬 '+s.note+'</div>' : '')+
+    occTimer+
+    '</div>';
+}
+
+function renderCards(list){
+  var el = document.getElementById('cardList');
+  var free = list.filter(function(s){ return s.free; });
+  document.getElementById('cntBadge').textContent = free.length + ' frei';
+  if(!list.length){
+    el.innerHTML='<div style="padding:30px;text-align:center;color:var(--mut);font-size:13px;">Keine Parkplätze gefunden.</div>';
+    return;
+  }
+  // mark nearest free
+  var nearestFreeId = -1;
+  for(var i=0;i<list.length;i++){ if(list[i].free){ nearestFreeId=list[i].id; break; } }
+  el.innerHTML = list.map(function(s){ return cardHTML(s, s.id===nearestFreeId); }).join('');
+}
+
+function filterCards(q){
+  searchQ = q || '';
+  renderCards(currentList());
+}
+function setFilter(btn, f){
+  activeFilter = f;
+  document.querySelectorAll('.fbtn').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  renderCards(currentList());
+}
+
+function selectSpot(id){
+  selSpot = id;
+  var s = spots[id];
+  document.getElementById('dpName').textContent = s.name;
+  document.getElementById('dpAddr').textContent = s.addr;
+  document.getElementById('dpNote').textContent = s.note || '(Keine Notiz hinterlegt)';
+  updateFavBtn(id);
+
+  var avEl = document.getElementById('dpAvail');
+  var occDiv = document.getElementById('occDetail');
+  var bookSec = document.getElementById('bookSection');
+
+  if(s.free){
+    avEl.innerHTML = '<span class="dot g"></span>Jetzt frei';
+    avEl.className = 'avb fr';
+    occDiv.style.display = 'none';
+    bookSec.style.display = 'block';
+    updateCost(s);
+  } else {
+    avEl.innerHTML = '<span class="dot r"></span>Belegt';
+    avEl.className = 'avb oc';
+    occDiv.style.display = 'block';
+    bookSec.style.display = 'none';
+    updateOccDetail(s);
+  }
+
+  document.getElementById('dp').classList.add('open');
+  if(mainMap){ mainMap.flyTo([s.lat, s.lng], 16, {animate:true, duration:.9}); }
+  Object.keys(mks).forEach(function(k){
+    mks[k].setIcon(mkIcon(spots[k].free, parseInt(k)===id));
+  });
+  renderCards(currentList());
+}
+
+function updateOccDetail(s){
+  if(!s.occEndTs) return;
+  var rem = Math.max(0, s.occEndTs - Date.now());
+  var m = Math.floor(rem/60000), sec = Math.floor((rem%60000)/1000);
+  document.getElementById('occCountdown').textContent = pad(m)+':'+pad(sec);
+  document.getElementById('occSub').textContent = 'Frei ab ca. '+freeAtStr(s);
+  var pct = occPct(s);
+  document.getElementById('occProgFill').style.width = pct+'%';
+}
+function freeAtStr(s){
+  if(!s.occEndTs) return '';
+  var d = new Date(s.occEndTs);
+  return pad(d.getHours())+':'+pad(d.getMinutes())+' Uhr';
+}
+
+function closeDetail(){
+  document.getElementById('dp').classList.remove('open');
+  selSpot = null;
+  Object.keys(mks).forEach(function(k){ mks[k].setIcon(mkIcon(spots[k].free, false)); });
+}
+
+/* ══ RESERVE AFTER OCCUPANCY ══ */
+function reserveAfterOcc(){
+  if(selSpot===null) return;
+  reserveAfterOccById(selSpot);
+}
+function reserveAfterOccById(id){
+  var s = spots[id];
+  showToast('📅 Vorgemerkt! Du wirst benachrichtigt, sobald "'+s.name+'" frei wird.', '📅');
+  // Simulate notification after spot becomes free
+  setTimeout(function(){
+    pushNotify('🅿️ Parkplatz frei!', '"'+s.name+'" ist jetzt verfügbar!', '🟢');
+    s.free = true;
+    s.occEndTs = null;
+    updateMarker(id);
+    renderCards(currentList());
+    if(selSpot===id) selectSpot(id);
+  }, 8000);
+}
+
+/* ══════════════════════════════════════════════
+   DRUM PICKER
+══════════════════════════════════════════════ */
+var IH = 44;
+var pickH = 8, pickM = 0, duration = 1;
+var HOURS = [], MINS = [];
+for(var i=0;i<24;i++) HOURS.push(i);
+for(var i=0;i<60;i+=5) MINS.push(i);
+
+var drumHCtrl, drumMCtrl;
+
+function buildDrum(elId, items, startVal, onChange){
+  var el = document.getElementById(elId);
+  if(!el) return {setVal:function(){}};
+  var N = items.length;
+  var PAD = 3;
+  var all = items.slice(-PAD).concat(items).concat(items.slice(0,PAD));
+  var inner = document.createElement('div');
+  inner.className = 'drum-inner';
+  all.forEach(function(v){
+    var d = document.createElement('div');
+    d.className = 'di';
+    d.textContent = pad(v);
+    inner.appendChild(d);
+  });
+  el.appendChild(inner);
+  var idx = items.indexOf(startVal); if(idx<0) idx=0;
+
+  function offsetOf(i){ return -(PAD+i)*IH + IH*2; }
+  function applyOffset(px, anim){
+    inner.style.transition = anim ? 'transform .22s cubic-bezier(.4,0,.2,1)' : 'none';
+    inner.style.transform = 'translateY('+px+'px)';
+  }
+  function styleCells(i){
+    var cells = inner.querySelectorAll('.di');
+    cells.forEach(function(c,ci){
+      var d = Math.abs(ci-(PAD+i));
+      c.className = 'di'+(d===0?' c0':d===1?' c1':d===2?' c2':'');
+    });
+  }
+  applyOffset(offsetOf(idx), false);
+  styleCells(idx);
+
+  function getPx(){
+    var t = inner.style.transform||'';
+    var m = t.match(/translateY\(([^)]+)px\)/);
+    return m ? parseFloat(m[1]) : offsetOf(idx);
+  }
+  function snap(px, vel){
+    var fling = vel * 4;
+    var raw = -(px+fling-IH*2)/IH - PAD;
+    var ni = Math.round(raw);
+    ni = ((ni%N)+N)%N;
+    idx = ni;
+    applyOffset(offsetOf(ni), true);
+    styleCells(ni);
+    onChange(items[ni]);
+  }
+
+  var dragY=null, startPx=null, vy=0, ly=null, lt=null;
+  function pDown(e){
+    e.preventDefault();
+    inner.style.transition='none';
+    var cy = e.touches ? e.touches[0].clientY : e.clientY;
+    dragY=cy; startPx=getPx(); vy=0; ly=cy; lt=Date.now();
+    window.addEventListener('mousemove',pMove,{passive:false});
+    window.addEventListener('touchmove',pMove,{passive:false});
+    window.addEventListener('mouseup',pUp);
+    window.addEventListener('touchend',pUp);
+  }
+  function pMove(e){
+    e.preventDefault();
+    var cy = e.touches ? e.touches[0].clientY : e.clientY;
+    var now = Date.now(), dt = Math.max(now-lt,1);
+    vy = (cy-ly)/dt*16; ly=cy; lt=now;
+    var px = startPx + (cy-dragY);
+    inner.style.transform='translateY('+px+'px)';
+    var ai = ((Math.round(-(px-IH*2)/IH-PAD))%N+N)%N;
+    styleCells(ai);
+  }
+  function pUp(){
+    window.removeEventListener('mousemove',pMove);
+    window.removeEventListener('touchmove',pMove);
+    window.removeEventListener('mouseup',pUp);
+    window.removeEventListener('touchend',pUp);
+    snap(getPx(), vy);
+  }
+  el.addEventListener('mousedown', pDown, {passive:false});
+  el.addEventListener('touchstart', pDown, {passive:false});
+  el.addEventListener('wheel', function(e){
+    e.preventDefault();
+    idx = ((idx+(e.deltaY>0?1:-1)+N)%N);
+    applyOffset(offsetOf(idx), true);
+    styleCells(idx);
+    onChange(items[idx]);
+  }, {passive:false});
+
+  return {setVal: function(v){
+    var ni = items.indexOf(v); if(ni<0) ni=0;
+    idx=ni; applyOffset(offsetOf(ni),false); styleCells(ni);
+  }};
+}
+
+function initDrums(){
+  var now = new Date();
+  var nowH = now.getHours();
+  // Round minutes up to nearest 5
+  var rawM = now.getMinutes();
+  var nowM = Math.ceil(rawM/5)*5;
+  if(nowM>=60){ nowM=0; nowH=(nowH+1)%24; }
+  pickH = nowH;
+  pickM = nowM;
+  drumHCtrl = buildDrum('drumH', HOURS, nowH, function(v){ pickH=v; updateTsum(); });
+  drumMCtrl = buildDrum('drumM', MINS, nowM, function(v){ pickM=v; updateTsum(); });
+}
+
+function updateTsum(){
+  var eh = (pickH+duration)%24;
+  document.getElementById('tsum').innerHTML =
+    'Ankunft: <strong>'+pad(pickH)+':'+pad(pickM)+'</strong>&nbsp;&nbsp;→&nbsp;&nbsp;Abfahrt ca. <strong>'+pad(eh)+':'+pad(pickM)+'</strong>';
+  if(selSpot!==null) updateCost(spots[selSpot]);
+}
+function setDur(btn, d){
+  duration=d;
+  document.querySelectorAll('.dbtn').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  updateTsum();
+}
+function updateCost(s){
+  var base = s.price*duration;
+  var tot = base+0.5;
+  document.getElementById('cBase').textContent='CHF '+base.toFixed(2);
+  document.getElementById('cTot').textContent='CHF '+tot.toFixed(2);
+  document.getElementById('btnTot').textContent='CHF '+tot.toFixed(2);
+}
+function setPay(el){
+  document.querySelectorAll('.pm').forEach(function(p){ p.classList.remove('active'); });
+  el.classList.add('active');
+}
+
+/* ══ BOOK ══ */
+var activeBooking = null; // {spotId, endTs, spotName, lat, lng}
+function book(){
+  if(selSpot===null) return;
+  var s = spots[selSpot];
+  var endMs = Date.now() + duration*3600*1000;
+  activeBooking = {spotId:selSpot, endTs:endMs, spotName:s.name, lat:s.lat, lng:s.lng};
+  spots[selSpot].free = false;
+  spots[selSpot].occEndTs = endMs;
+  spots[selSpot].occTotalMs = duration*3600*1000;
+  updateMarker(selSpot);
+  showToast('✅ Gebucht ab '+pad(pickH)+':'+pad(pickM)+' für '+duration+' Std.', '✅');
+  // notify owner
+  setTimeout(function(){
+    pushNotify('🏠 Buchung eingegangen!', '"'+s.name+'" wurde für '+duration+' Std. gebucht.', '🏠');
+  }, 1200);
+  // schedule reminder 10min before end
+  var reminderDelay = Math.max(0, duration*3600*1000 - 10*60*1000);
+  if(reminderDelay < duration*3600*1000){
+    setTimeout(function(){ showReminder(); }, reminderDelay);
+  }
+  // demo: simulate after 12s a depart detection
+  setTimeout(function(){ showDepartPopup(s.name); }, 12000);
+  renderCards(currentList());
+  // update popup
+  if(mainMap) mks[selSpot].setPopupContent(popHTML(spots[selSpot]));
+  selectSpot(selSpot);
+}
+
+function updateMarker(id){
+  if(mks[id]) mks[id].setIcon(mkIcon(spots[id].free, selSpot===id));
+  if(mks[id]) mks[id].setPopupContent(popHTML(spots[id]));
+}
+
+/* ══ REMINDER ══ */
+var reminderInterval = null;
+function showReminder(){
+  if(!activeBooking) return;
+  document.getElementById('reminderSpot').textContent = activeBooking.spotName;
+  document.getElementById('reminderOvl').classList.add('open');
+  var remaining = 10*60; // seconds
+  function tick(){
+    remaining = Math.max(0, Math.floor((activeBooking.endTs - Date.now())/1000));
+    var m = Math.floor(remaining/60), s = remaining%60;
+    document.getElementById('reminderCount').textContent = pad(m)+':'+pad(s);
+    if(remaining<=0){ dismissReminder(); }
+  }
+  tick();
+  reminderInterval = setInterval(tick, 1000);
+}
+function dismissReminder(){
+  document.getElementById('reminderOvl').classList.remove('open');
+  if(reminderInterval){ clearInterval(reminderInterval); reminderInterval=null; }
+}
+function extendParking(){
+  if(!activeBooking) return;
+  var s = spots[activeBooking.spotId];
+  // check if next period is free (demo: always allow)
+  activeBooking.endTs += 30*60*1000;
+  spots[activeBooking.spotId].occEndTs = activeBooking.endTs;
+  dismissReminder();
+  showToast('🕐 Um 30 Minuten verlängert!', '🕐');
+  pushNotify('⏰ Verlängerung', '"'+s.name+'" wurde um 30 min verlängert.', '⏰');
+}
+
+/* ══ DEPART POPUP ══ */
+function showDepartPopup(name){
+  document.getElementById('departSpotName').textContent = '📍 '+name;
+  document.getElementById('departOvl').classList.add('open');
+}
+function closeDepartPopup(){
+  document.getElementById('departOvl').classList.remove('open');
+}
+function confirmDepart(){
+  closeDepartPopup();
+  if(!activeBooking) return;
+  var id = activeBooking.spotId;
+  spots[id].free = true;
+  spots[id].occEndTs = null;
+  updateMarker(id);
+  renderCards(currentList());
+  pushNotify('🅿️ Platz freigegeben!', '"'+spots[id].name+'" ist jetzt wieder verfügbar.', '🟢');
+  // notify favorites
+  if(isFav(id)){
+    setTimeout(function(){
+      pushNotify('⭐ Favorit verfügbar!', 'Dein gespeicherter Platz "'+spots[id].name+'" ist jetzt frei!', '⭐');
+    }, 800);
+  }
+  activeBooking = null;
+  showToast('✅ Parkplatz freigegeben!', '✅');
+  if(selSpot===id) selectSpot(id);
+}
+
+/* ══ PUSH NOTIFICATIONS ══ */
+var notifQueue = [], notifActive = false;
+function pushNotify(title, msg, icon){
+  notifQueue.push({title:title, msg:msg, icon:icon||'🔔'});
+  if(!notifActive) flushNotif();
+}
+function flushNotif(){
+  if(!notifQueue.length){ notifActive=false; return; }
+  notifActive=true;
+  var n = notifQueue.shift();
+  var el = document.getElementById('notif');
+  document.getElementById('notifTitle').textContent = n.title;
+  document.getElementById('notifMsg').textContent = n.msg;
+  document.getElementById('notifIcon').textContent = n.icon;
+  var now = new Date();
+  document.getElementById('notifTime').textContent = pad(now.getHours())+':'+pad(now.getMinutes());
+  el.classList.add('show');
+  setTimeout(function(){
+    el.classList.remove('show');
+    setTimeout(flushNotif, 400);
+  }, 4500);
+}
+function closeNotif(){
+  document.getElementById('notif').classList.remove('show');
+  notifActive=false;
+  setTimeout(flushNotif, 400);
+}
+
+/* ══ RENTER MAP ══ */
+var rMap = null;
+function openRenterMap(){
+  if(selSpot===null) return;
+  var s = spots[selSpot];
+  document.getElementById('renterTitle').textContent = '🗺️ '+s.name;
+  document.getElementById('renterAddr').textContent = '📍 '+s.addr;
+  document.getElementById('renterOvl').classList.add('open');
+  setTimeout(function(){
+    if(rMap){ rMap.remove(); rMap=null; }
+    rMap = L.map('renterMap').setView([s.lat, s.lng], 16);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(rMap);
+    L.marker([s.lat, s.lng], {icon:mkIcon(s.free,true)}).addTo(rMap)
+      .bindPopup('<div class="pop"><div class="pop-name">'+s.name+'</div><div class="pop-addr">'+s.addr+'</div></div>',{closeButton:false}).openPopup();
+    var from = [s.lat+0.007, s.lng-0.013];
+    L.polyline([from,[s.lat,s.lng]],{color:'#4ade80',weight:5,opacity:.85,dashArray:'10 7'}).addTo(rMap);
+    L.marker(from,{icon:L.divIcon({
+      html:'<div style="width:13px;height:13px;background:#22d3ee;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.5);"></div>',
+      className:'',iconSize:[13,13],iconAnchor:[6,6]
+    })}).addTo(rMap).bindTooltip('Dein Standort',{permanent:true,direction:'top',offset:[0,-10]});
+    rMap.invalidateSize();
+  }, 120);
+}
+function closeRenterMap(){ document.getElementById('renterOvl').classList.remove('open'); }
+
+/* ══ OWNER MAP ══ */
+var oMap=null, oMarker=null, oLL=null;
+function openOwnerMap(){
+  document.getElementById('ownerOvl').classList.add('open');
+  setTimeout(function(){
+    if(oMap){ oMap.remove(); oMap=null; }
+    oMap = L.map('ownerMap').setView([47.376,8.541],14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(oMap);
+    oMap.on('click', function(e){
+      oLL = e.latlng;
+      if(oMarker) oMarker.remove();
+      oMarker = L.marker(e.latlng,{icon:mkIcon(true,true),draggable:true}).addTo(oMap);
+      oMarker.on('dragend',function(ev){ oLL=ev.target.getLatLng(); doRevGeo(); });
+      doRevGeo();
+    });
+    oMap.invalidateSize();
+  }, 120);
+}
+function doRevGeo(){
+  if(!oLL) return;
+  var txt = 'Lat '+oLL.lat.toFixed(5)+', Lng '+oLL.lng.toFixed(5);
+  document.getElementById('ownerSelAddr').textContent='📍 '+txt;
+  document.getElementById('ownerAddr').value=txt;
+  fetch('https://nominatim.openstreetmap.org/reverse?lat='+oLL.lat+'&lon='+oLL.lng+'&format=json')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var a=(d.display_name||txt).split(',').slice(0,4).join(', ');
+      document.getElementById('ownerSelAddr').textContent='📍 '+a;
+      document.getElementById('ownerAddr').value=a;
+    }).catch(function(){});
+}
+function confirmOwnerLoc(){
+  if(!oLL){ showToast('⚠️ Bitte zuerst Standort wählen','⚠️'); return; }
+  showToast('📍 Standort übernommen!','📍');
+  document.getElementById('ownerOvl').classList.remove('open');
+}
+function closeOwnerMap(){ document.getElementById('ownerOvl').classList.remove('open'); }
+function locateOwner(){
+  if(!navigator.geolocation){ showToast('GPS nicht verfügbar','⚠️'); return; }
+  navigator.geolocation.getCurrentPosition(function(pos){
+    oLL={lat:pos.coords.latitude, lng:pos.coords.longitude};
+    showToast('📍 GPS-Standort erkannt!','📍');
+    if(oMap) oMap.setView([oLL.lat,oLL.lng],17);
+    document.getElementById('ownerAddr').value=oLL.lat.toFixed(5)+', '+oLL.lng.toFixed(5);
+  }, function(){ showToast('GPS-Zugriff verweigert','⚠️'); });
+}
+function publishSpot(){
+  var name=document.getElementById('ownerName').value.trim();
+  var addr=document.getElementById('ownerAddr').value.trim();
+  if(!name||!addr){ showToast('⚠️ Bitte Name und Adresse ausfüllen','⚠️'); return; }
+  var price=parseFloat(document.getElementById('ownerPrice').value)||3.5;
+  var from=document.getElementById('ownerFrom').value;
+  var to=document.getElementById('ownerTo').value;
+  var type=document.getElementById('ownerType').value;
+  var note=document.getElementById('ownerNote').value;
+  var lat=oLL?oLL.lat:47.376+(Math.random()*.02-.01);
+  var lng=oLL?oLL.lng:8.541+(Math.random()*.02-.01);
+  var id=spots.length;
+  var ns={id:id,name:name,addr:addr,type:type,price:price,from:from,to:to,maxH:4,free:true,note:note,lat:lat,lng:lng,dist:100};
+  spots.push(ns);
+  if(mainMap){
+    var m=L.marker([lat,lng],{icon:mkIcon(true,false)}).addTo(mainMap);
+    m.bindPopup(popHTML(ns),{className:'',maxWidth:260,closeButton:false});
+    m.on('click',(function(sid){ return function(){ selectSpot(sid); }; })(id));
+    mks[id]=m;
+  }
+  showToast('🎉 "'+name+'" veröffentlicht!','🎉');
+  oLL=null;
+  setTimeout(function(){ switchMode('search'); },1600);
+}
+
+/* ══ KEYBOARD SEARCH OVERLAY ══ */
+var kbQuery = '';
+var kbOpen = false;
+
+var cities = ['Zürich','Bern','Basel','Luzern','Genf','Lausanne','St. Gallen','Winterthur'];
+var quickSuggestions = [
+  {icon:'📍',name:'Nächster freier Parkplatz',sub:'Automatisch nähesten wählen',action:function(){
+    var free = spots.filter(function(s){ return s.free; });
+    free.sort(function(a,b){ return a.dist-b.dist; });
+    if(free.length){ closeKb(); selectSpot(free[0].id); }
+    else showToast('Kein freier Platz gefunden','⚠️');
+  }},
+  {icon:'⭐',name:'Meine Favoriten anzeigen',sub:'Gespeicherte Parkplätze',action:function(){ closeKb(); switchMode('favs'); }},
+  {icon:'🏠',name:'Tiefgaragen in der Nähe',sub:'Nur Garagen anzeigen',action:function(){
+    closeKb(); setFilterByKey('garage');
+  }},
+  {icon:'☀️',name:'Freiluft-Parkplätze',sub:'Nur Freiluft-Plätze',action:function(){
+    closeKb(); setFilterByKey('open');
+  }},
+];
+
+function openKb(){
+  kbOpen = true;
+  document.getElementById('kbOvl').classList.add('open');
+  setTimeout(function(){
+    var inp = document.getElementById('kbInput');
+    inp.value = kbQuery;
+    inp.focus();
+    renderKbSuggestions(kbQuery);
+    document.getElementById('kbClearBtn').style.display = kbQuery ? 'block' : 'none';
+  }, 160);
+}
+
+function closeKb(){
+  document.getElementById('kbOvl').classList.remove('open');
+  kbOpen = false;
+}
+
+function kbClear(){
+  document.getElementById('kbInput').value = '';
+  kbQuery = '';
+  document.getElementById('kbClearBtn').style.display = 'none';
+  searchQ = '';
+  document.getElementById('searchDisplayText').textContent = 'Ort, Adresse oder Quartier…';
+  document.getElementById('searchDisplayText').style.color = 'var(--mut)';
+  renderCards(currentList());
+  renderKbSuggestions('');
+  document.getElementById('kbInput').focus();
+}
+
+function kbFilter(q){
+  kbQuery = q;
+  document.getElementById('kbClearBtn').style.display = q ? 'block' : 'none';
+  renderKbSuggestions(q);
+}
+
+function kbSelectSpot(id){
+  closeKb();
+  selectSpot(id);
+  searchQ = '';
+  document.getElementById('searchDisplayText').textContent = spots[id].name;
+  document.getElementById('searchDisplayText').style.color = 'var(--txt)';
+}
+
+function kbApplySearch(q){
+  searchQ = q;
+  renderCards(currentList());
+  closeKb();
+  if(q){
+    document.getElementById('searchDisplayText').textContent = '🔍 ' + q;
+    document.getElementById('searchDisplayText').style.color = 'var(--txt)';
+  } else {
+    document.getElementById('searchDisplayText').textContent = 'Ort, Adresse oder Quartier…';
+    document.getElementById('searchDisplayText').style.color = 'var(--mut)';
+  }
+}
+
+function setFilterByKey(f){
+  activeFilter = f;
+  document.querySelectorAll('.fbtn').forEach(function(b,i){
+    b.classList.toggle('active',
+      (f==='all'&&i===0)||(f==='garage'&&i===1)||(f==='open'&&i===2)||(f==='free'&&i===3));
+  });
+  renderCards(currentList());
+}
+
+function renderKbSuggestions(q){
+  var el = document.getElementById('kbSuggestions');
+  var html = '';
+
+  if(!q){
+    // Show quick actions + all spots grouped by city
+    html += '<div class="kb-sec-label">Schnellzugriff</div>';
+    quickSuggestions.forEach(function(s,i){
+      html += '<div class="kb-item" onclick="quickSuggestions['+i+'].action()">'+
+        '<div class="kb-item-icon">'+s.icon+'</div>'+
+        '<div><div class="kb-item-name">'+s.name+'</div><div class="kb-item-sub">'+s.sub+'</div></div>'+
+        '</div>';
+    });
+    html += '<div class="kb-sec-label" style="margin-top:8px;">Alle Parkplätze</div>';
+    spots.forEach(function(s){
+      html += '<div class="kb-item" onclick="kbSelectSpot('+s.id+')">'+
+        '<div class="kb-item-icon">'+(s.free?'🟢':'🔴')+'</div>'+
+        '<div style="flex:1;min-width:0;">'+
+          '<div class="kb-item-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+s.name+'</div>'+
+          '<div class="kb-item-sub">'+s.addr+'</div>'+
+        '</div>'+
+        '<div class="kb-item-price">CHF '+s.price.toFixed(2)+'/h</div>'+
+        '</div>';
+    });
+  } else {
+    var ql = q.toLowerCase();
+    // Match spots
+    var matched = spots.filter(function(s){
+      return s.name.toLowerCase().indexOf(ql)>=0 ||
+             s.addr.toLowerCase().indexOf(ql)>=0 ||
+             s.type.toLowerCase().indexOf(ql)>=0;
+    });
+    // Match city shortcuts
+    var cityMatches = cities.filter(function(c){ return c.toLowerCase().indexOf(ql)>=0; });
+
+    if(cityMatches.length){
+      html += '<div class="kb-sec-label">Städte</div>';
+      cityMatches.forEach(function(c){
+        var cnt = spots.filter(function(s){ return s.addr.indexOf(c)>=0 && s.free; }).length;
+        html += '<div class="kb-item" onclick="kbApplySearch(\''+c+'\')">'+
+          '<div class="kb-item-icon">🏙️</div>'+
+          '<div><div class="kb-item-name">'+c+'</div>'+
+          '<div class="kb-item-sub">'+cnt+' freie Parkplätze</div></div>'+
+          '</div>';
+      });
+    }
+
+    if(matched.length){
+      html += '<div class="kb-sec-label">'+(cityMatches.length?'Parkplätze':'Suchergebnisse')+'</div>';
+      matched.forEach(function(s){
+        var name = s.name.replace(new RegExp('('+q+')','gi'),'<mark style="background:rgba(74,222,128,.25);color:var(--acc);border-radius:2px;">$1</mark>');
+        html += '<div class="kb-item" onclick="kbSelectSpot('+s.id+')">'+
+          '<div class="kb-item-icon">'+(s.free?'🟢':'🔴')+'</div>'+
+          '<div style="flex:1;min-width:0;">'+
+            '<div class="kb-item-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+name+'</div>'+
+            '<div class="kb-item-sub">'+s.addr+'</div>'+
+          '</div>'+
+          '<div class="kb-item-price">CHF '+s.price.toFixed(2)+'/h</div>'+
+          '</div>';
+      });
+    }
+
+    if(!matched.length && !cityMatches.length){
+      html += '<div class="kb-no-results">'+
+        '<div style="font-size:32px;margin-bottom:10px;">🔍</div>'+
+        'Keine Ergebnisse für <strong style="color:var(--txt);">«'+q+'»</strong><br>'+
+        '<span style="font-size:12px;">Versuche eine andere Schreibweise.</span></div>';
+    }
+
+    // Always show "Alle Ergebnisse anzeigen" at bottom
+    if(matched.length){
+      html += '<div class="kb-item" onclick="kbApplySearch(\''+q+'\')" style="margin-top:4px;border:1px solid var(--brd);">'+
+        '<div class="kb-item-icon">🔍</div>'+
+        '<div><div class="kb-item-name">Alle Ergebnisse für «'+q+'»</div>'+
+        '<div class="kb-item-sub">'+matched.length+' Parkplätze</div></div>'+
+        '</div>';
+    }
+  }
+
+  el.innerHTML = html;
+}
+
+// Close kb on Escape
+document.addEventListener('keydown', function(e){
+  if(e.key==='Escape' && kbOpen) closeKb();
+  if(e.key==='Enter' && kbOpen){
+    var q = document.getElementById('kbInput').value;
+    if(q) kbApplySearch(q);
+  }
+});
+
+/* ══ SWITCH MODE ══ */
+function switchMode(mode){
+  document.querySelectorAll('.ntab').forEach(function(t,i){
+    t.classList.toggle('active',(mode==='search'&&i===0)||(mode==='rent'&&i===1)||(mode==='favs'&&i===2));
+  });
+  document.getElementById('searchMode').style.display=mode==='search'?'block':'none';
+  document.getElementById('rentMode').style.display=mode==='rent'?'block':'none';
+  document.getElementById('favsMode').style.display=mode==='favs'?'block':'none';
+  if(mode==='rent') closeDetail();
+  if(mode==='favs') renderFavs();
+  if(mainMap) setTimeout(function(){ mainMap.invalidateSize(); },60);
+}
+
+/* ══ TOAST ══ */
+function showToast(msg, icon){
+  var t=document.getElementById('toast');
+  document.getElementById('toastMsg').textContent=msg;
+  document.getElementById('toastIcon').textContent=icon||'✅';
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t=setTimeout(function(){ t.classList.remove('show'); },3800);
+}
+
+function pad(n){ return String(n).padStart(2,'0'); }
+
+/* ══ LIVE TICKER ══ */
+function liveTick(){
+  // update occ timers on cards
+  document.querySelectorAll('.occ-timer-val').forEach(function(el){
+    var id=parseInt(el.getAttribute('data-id'));
+    var s=spots[id];
+    if(!s||!s.occEndTs) return;
+    el.textContent=occTimeString(s);
+    var fill=document.querySelector('[data-id="fill-'+id+'"]');
+    if(fill) fill.style.width=occPct(s)+'%';
+    // auto-free when timer hits 0
+    if(Date.now()>=s.occEndTs){
+      s.free=true; s.occEndTs=null;
+      updateMarker(id);
+      renderCards(currentList());
+      pushNotify('🅿️ Platz wieder frei!', '"'+s.name+'" ist jetzt verfügbar.','🟢');
+      if(isFav(id)) setTimeout(function(){
+        pushNotify('⭐ Favorit frei!','"'+s.name+'" (dein Favorit) ist jetzt frei!','⭐');
+      },600);
+    }
+  });
+  // update occ detail if open
+  if(selSpot!==null && !spots[selSpot].free) updateOccDetail(spots[selSpot]);
+  // update popup timers
+  Object.keys(mks).forEach(function(k){
+    var s=spots[k];
+    if(!s.free && s.occEndTs) mks[k].setPopupContent(popHTML(s));
+  });
+}
+
+/* ══ INIT ══ */
+window.addEventListener('load', function(){
+  initMap();
+  initDrums();
+  renderCards(currentList());
+  updateTsum();
+  setInterval(liveTick, 1000);
+  // demo push after 3s
+  setTimeout(function(){
+    pushNotify('👋 Willkommen!','ParkShare ist bereit. Wähle einen Parkplatz auf der Karte.','🅿️');
+  }, 2500);
+});
+</script>
+</body>
+</html>
